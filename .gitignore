@@ -171,3 +171,4 @@ tensorboard_logs
 evaluator/CodeBLEU/parser/my-languages.so
 /spm/
 evaluator/CodeBLEU/parser/tree-sitter-*
+sample.tstree.json

@@ -47,7 +47,7 @@ def get_codebleu(refs, hyp, lang, params='0.25,0.25,0.25,0.25'):
     weighted_ngram_match_score = weighted_ngram_match.corpus_bleu(tokenized_refs_with_weights, tokenized_hyps)
 
     # calculate syntax match
-    syntax_match_score = syntax_match.corpus_syntax_match(references, hypothesis, lang)
+    syntax_match_score = syntax_match.corpus_syntax_match(references, hypothesis, lang)  # rust-ok
 
     # calculate dataflow match
     dataflow_match_score = dataflow_match.corpus_dataflow_match(references, hypothesis, lang)

@@ -38,20 +38,17 @@ def treeify(n: Node) -> dict:
 
 
 if __name__ == "__main__":
-    code = b"""#use rtrb::{RingBuffer, PopError};
-
-let (mut p, mut c) = RingBuffer::new(4);
-
-let mut it = vec![10, 20, 30].into_iter();
-if let Ok(chunk) = p.write_chunk_uninit(2) {
-    assert_eq!(chunk.fill_from_iter(&mut it), 2);
-} else {
-    unreachable!();
-}
-assert_eq!(c.pop(), Ok(10));
-assert_eq!(c.pop(), Ok(20));
-assert_eq!(c.pop(), Err(PopError::Empty));
-assert_eq!(it.next(), Some(30));
+    code = b"""
+    fn main() {
+        let x = 1;
+        let y = 2;
+        let z = x + y;
+        x = y;
+        y += z;
+        if x == y {
+        } else {
+        }
+    }
 }"""
     print(code)
 
