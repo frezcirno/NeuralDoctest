@@ -1,3 +1,4 @@
+import os
 import random
 import torch
 import logging
@@ -26,7 +27,7 @@ def add_args(parser):
     parser.add_argument("--res_fn", type=str, default='')
     parser.add_argument("--add_task_prefix", action='store_true', help="Whether to add task prefix for t5 and codet5")
     parser.add_argument("--save_last_checkpoints", action='store_true')
-    parser.add_argument("--always_save_model", action='store_true')
+    parser.add_argument("--always_save_model", action='store_true', default=True)
     parser.add_argument("--do_eval_bleu", action='store_true', help="Whether to evaluate bleu on dev set.")
 
     ## Required parameters
@@ -66,9 +67,9 @@ def add_args(parser):
     parser.add_argument("--no_cuda", action='store_true',
                         help="Avoid using CUDA when available")
 
-    parser.add_argument("--train_batch_size", default=8, type=int,
+    parser.add_argument("--train_batch_size", default=128, type=int,
                         help="Batch size per GPU/CPU for training.")
-    parser.add_argument("--eval_batch_size", default=8, type=int,
+    parser.add_argument("--eval_batch_size", default=128, type=int,
                         help="Batch size per GPU/CPU for evaluation.")
     parser.add_argument('--gradient_accumulation_steps', type=int, default=1,
                         help="Number of updates steps to accumulate before performing a backward/update pass.")
@@ -99,10 +100,13 @@ def add_args(parser):
                         help="random seed for initialization")
     args = parser.parse_args()
 
+    if os.environ.get("LOCAL_RANK") is not None:
+        args.local_rank = int(os.environ["LOCAL_RANK"])
+
     if args.task in ['summarize']:
         args.lang = args.sub_task
     elif args.task in ['refine', 'concode', 'clone']:
-        args.lang = 'java'
+        args.lang = 'rust'
     elif args.task == 'defect':
         args.lang = 'c'
     elif args.task == 'translate':

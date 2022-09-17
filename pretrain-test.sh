@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node 2 codet5_pretrain.py --task summarize --cache_path cache --summary_dir summary --data_dir xxx --res_dir run_new/res --output_dir run_new --do_train --do_eval --train_batch_size 128 --eval_batch_size 64 --always_save_model --load_model_path run_new/checkpoint-best-bleu/pytorch_model.bin --do_eval_bleu

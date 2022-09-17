@@ -1,3 +1,4 @@
+import pandas as pd
 from torch.utils.data import TensorDataset
 import numpy as np
 import logging
@@ -15,35 +16,11 @@ def load_and_cache_gen_data(args, filename, pool, tokenizer, split_tag, only_src
     # cache the data into args.cache_path except it is sampled
     # only_src: control whether to return only source ids for bleu evaluating (dev/test)
     # return: examples (Example object), data (TensorDataset)
-    data_tag = '_all' if args.data_num == -1 else '_%d' % args.data_num
-    cache_fn = '{}/{}.pt'.format(args.cache_path, split_tag + ('_src' if only_src else '') + data_tag)
-
-    examples = read_examples(filename, args.data_num, args.task)
-
-    if is_sample:
-        examples = random.sample(examples, min(5000, len(examples)))
-    if split_tag == 'train':
-        calc_stats(examples, tokenizer, is_tokenize=True)
-    else:
-        calc_stats(examples)
-    if os.path.exists(cache_fn) and not is_sample:
-        logger.info("Load cache data from %s", cache_fn)
-        data = torch.load(cache_fn)
-    else:
-        if is_sample:
-            logger.info("Sample 5k data for computing bleu from %s", filename)
-        else:
-            logger.info("Create cache data into %s", cache_fn)
-        tuple_examples = [(example, idx, tokenizer, args, split_tag) for idx, example in enumerate(examples)]
-        features = pool.map(convert_examples_to_features, tqdm(tuple_examples, total=len(tuple_examples)))
-        all_source_ids = torch.tensor([f.source_ids for f in features], dtype=torch.long)
-        if split_tag == 'test' or only_src:
-            data = TensorDataset(all_source_ids)
-        else:
-            all_target_ids = torch.tensor([f.target_ids for f in features], dtype=torch.long)
-            data = TensorDataset(all_source_ids, all_target_ids)
-        if args.local_rank in [-1, 0] and not is_sample:
-            torch.save(data, cache_fn)
+    examples = None
+    data = torch.load(filename)
+    if 'valid' in filename or 'test' in filename:
+        example_file = filename.replace('dataset', 'examples')
+        examples = torch.load(example_file)
     return examples, data
 
 
