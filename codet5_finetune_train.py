@@ -135,7 +135,7 @@ def eval_bleu_epoch(args, eval_data, eval_examples, model, tokenizer, split_tag,
                 codebleu = calc_code_bleu.get_codebleu(gold_fn, output_fn, args.lang)
 
         result = {'em': np.mean(dev_accs) * 100, 'bleu': bleu}
-        if args.task == 'concode':
+        if args.task in ['concode', 'translate', 'refine']:
             result['codebleu'] = codebleu * 100
 
     logger.info("***** Eval results *****")
@@ -210,7 +210,7 @@ def main():
         # for DataParallel
         model = torch.nn.DataParallel(model)
     pool = multiprocessing.Pool(args.cpu_cont)
-    args.train_filename, args.dev_filename, args.test_filename = "/data1/zixuantan/github/data/codedocdata.processed.codet5.finetune.train.dataset", "/data1/zixuantan/github/data/codedocdata.processed.codet5.finetune.valid.dataset", "/data1/zixuantan/github/data/codedocdata.processed.codet5.finetune.test.dataset"
+    args.train_filename, args.dev_filename, args.test_filename = "/data1/zixuantan/github/data-new/codedocdata.processed.codet5.finetune.train.dataset", "/data1/zixuantan/github/data-new/codedocdata.processed.codet5.finetune.valid.dataset", "/data1/zixuantan/github/data-new/codedocdata.processed.codet5.finetune.test.dataset"
     fa = open(os.path.join(args.output_dir, 'summary.log'), 'a+')
 
     if args.do_train:
