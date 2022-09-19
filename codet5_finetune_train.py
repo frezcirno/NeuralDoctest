@@ -94,9 +94,12 @@ def eval_bleu_epoch(args, eval_data, eval_examples, model, tokenizer, split_tag,
 
     pred_nls = [tokenizer.decode(id, skip_special_tokens=True, clean_up_tokenization_spaces=False) for id in pred_ids]
 
-    output_fn = os.path.join(args.res_dir, "test_{}.output".format(criteria))
-    gold_fn = os.path.join(args.res_dir, "test_{}.gold".format(criteria))
-    src_fn = os.path.join(args.res_dir, "test_{}.src".format(criteria))
+    output_fn_idx = os.path.join(args.res_dir, "test_{}.output".format(criteria))
+    gold_fn_idx = os.path.join(args.res_dir, "test_{}.gold".format(criteria))
+    src_fn_idx = os.path.join(args.res_dir, "test_{}.src".format(criteria))
+    output_fn_noidx = os.path.join(args.res_dir, "test_{}.noidx.output".format(criteria))
+    gold_fn_noidx = os.path.join(args.res_dir, "test_{}.noidx.gold".format(criteria))
+    src_fn_noidx = os.path.join(args.res_dir, "test_{}.noidx.src".format(criteria))
 
     if args.task in ['defect']:
         target_dict = {0: 'false', 1: 'true'}
@@ -104,35 +107,36 @@ def eval_bleu_epoch(args, eval_data, eval_examples, model, tokenizer, split_tag,
         eval_acc = np.mean([int(p == g) for p, g in zip(pred_nls, golds)])
         result = {'em': eval_acc * 100, 'bleu': 0, 'codebleu': 0}
 
-        with open(output_fn, 'w') as f, open(gold_fn, 'w') as f1, open(src_fn, 'w') as f2:
+        with open(output_fn_noidx, 'w') as f, open(gold_fn_noidx, 'w') as f1, open(src_fn_noidx, 'w') as f2:
             for pred_nl, gold in zip(pred_nls, eval_examples):
                 f.write(pred_nl.strip() + '\n')
                 f1.write(target_dict[gold.target] + '\n')
                 f2.write(gold.source.strip() + '\n')
-            logger.info("Save the predictions into %s", output_fn)
+            logger.info("Save the predictions into %s", output_fn_noidx)
     else:
         dev_accs, predictions = [], []
-        with open(output_fn, 'w') as f, open(gold_fn, 'w') as f1, open(src_fn, 'w') as f2:
+        with open(output_fn_idx, 'w') as f, open(gold_fn_idx, 'w') as f1, open(src_fn_idx, 'w') as f2, \
+                open(output_fn_noidx, 'w') as ff, open(gold_fn_noidx, 'w') as ff1, open(src_fn_noidx, 'w') as ff2:
             for pred_nl, gold in zip(pred_nls, eval_examples):
                 dev_accs.append(pred_nl.strip() == gold.target.strip())
-                if args.task in ['summarize']:
-                    # for smooth-bleu4 evaluation
-                    predictions.append(str(gold.idx) + '\t' + pred_nl)
-                    f.write(str(gold.idx) + '\t' + pred_nl.strip() + '\n')
-                    f1.write(str(gold.idx) + '\t' + gold.target.strip() + '\n')
-                    f2.write(str(gold.idx) + '\t' + gold.source.strip() + '\n')
-                else:
-                    f.write(pred_nl.strip() + '\n')
-                    f1.write(gold.target.strip() + '\n')
-                    f2.write(gold.source.strip() + '\n')
+                # for smooth-bleu4 evaluation
+                predictions.append(str(gold.idx) + '\t' + pred_nl)
+
+                f.write(str(gold.idx) + '\t' + pred_nl.strip() + '\n')
+                f1.write(str(gold.idx) + '\t' + gold.target.strip() + '\n')
+                f2.write(str(gold.idx) + '\t' + gold.source.strip() + '\n')
+
+                ff.write(pred_nl.strip() + '\n')
+                ff1.write(gold.target.strip() + '\n')
+                ff2.write(gold.source.strip() + '\n')
 
         if args.task == 'summarize':
-            (goldMap, predictionMap) = smooth_bleu.computeMaps(predictions, gold_fn)
+            (goldMap, predictionMap) = smooth_bleu.computeMaps(predictions, gold_fn_idx)
             bleu = round(smooth_bleu.bleuFromMaps(goldMap, predictionMap)[0], 2)
         else:
-            bleu = round(_bleu(gold_fn, output_fn), 2)
+            bleu = round(_bleu(gold_fn_noidx, output_fn_noidx), 2)
             if args.task in ['concode', 'translate', 'refine']:
-                codebleu = calc_code_bleu.get_codebleu(gold_fn, output_fn, args.lang)
+                codebleu = calc_code_bleu.get_codebleu(gold_fn_noidx, output_fn_noidx, args.lang)
 
         result = {'em': np.mean(dev_accs) * 100, 'bleu': bleu}
         if args.task in ['concode', 'translate', 'refine']:

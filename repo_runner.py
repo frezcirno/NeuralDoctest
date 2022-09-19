@@ -10,9 +10,10 @@ from ts.parse import parse_ast
 
 def replace_general_string_tok(tok: str) -> str:
     return (
-        tok.replace(" ▁ ", " ")
-        .replace(" STRNEWLINE ", "\n")
+        tok.replace(" STRNEWLINE ", "\n")
         .replace(" TABSYMBOL ", "\t")
+        .replace(" ", "")
+        .replace("▁", " ")
     )
 
 
@@ -76,13 +77,6 @@ def find_cargo_toml(path: str) -> str:
             return ""
 
 
-rustc = shutil.which('rustc')
-cargo = shutil.which('cargo')
-git = shutil.which('git')
-odf = pd.read_parquet("data/codedocdata.parquet")
-all_repo_base = "/data/zixuantan/rust_repos/"
-
-
 def run_test(row):
     idx = row.Index
     # repo = odf.loc[idx].repo
@@ -98,12 +92,14 @@ def run_test(row):
     foutput = os.path.join(file_base, f"codet5_generated_{idx}.output")
     fgold = os.path.join(file_base, f"codet5_generated_{idx}.gold")
 
+    print(fgenerated)
+
     fcargo = find_cargo_toml(file)
     if not fcargo:
         print(f"{file} has no Cargo.toml")
         return False
     crate_base = os.path.dirname(fcargo)
-    subprocess.Popen([cargo, "clean"], cwd=crate_base, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
+    # subprocess.Popen([cargo, "clean"], cwd=crate_base, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
 
     directive = f"\n[[bin]]\nname = \"codet5_generated_{idx}\"\npath = \"{fgenerated}\"\n"
     with open(fcargo, "r") as f:
@@ -129,6 +125,16 @@ def run_test(row):
                     uses.append(line)
                 else:
                     nonuses.append(line)
+            # Copy the original use statements
+            # with open(file, 'r') as target:
+            #     start = 0
+            #     for line in target:
+            #         if start or line.startswith("use "):
+            #             f.write(line)
+            #             start = 1
+            #         if ';' in line:
+            #             start = 0
+            # Copy generated use statements
             for line in uses:
                 f.write(line.lstrip(" #"))
                 f.write(";\n")
@@ -165,12 +171,18 @@ def process(path):
     for row in df.itertuples():
         rv = run_test(row)
         if rv:
+            print('.', end='')
             succ += 1
         total += 1
     return succ, total
 
 
-df = pd.read_parquet("data/test_best-bleu.parquet")
+rustc = shutil.which('rustc')
+cargo = shutil.which('cargo')
+git = shutil.which('git')
+odf = pd.read_parquet("data-new/codedocdata.parquet")
+all_repo_base = "/data1/zixuantan/rust_repos/"
+df = pd.read_parquet("data-new/test_best-bleu.parquet")
 
 df['gold'] = df['gold'].apply(parse_code)
 df['output'] = df['output'].apply(parse_code)
@@ -178,13 +190,13 @@ df['output'] = df['output'].apply(parse_code)
 # Split the dataframe into multiple dataframes
 paths = []
 for i in range(0, df.shape[0], 50):
-    path = f'data/tmp/part_{i}.parquet'
+    path = f'/tmp/part_{i}.parquet'
     df.iloc[i:i + 50].to_parquet(path)
     paths.append(path)
 print(f"{len(paths)} files created")
 
 
-with Pool() as pool:
+with Pool(4) as pool:
     res = pool.map(process, paths)
 
 succ = 0
