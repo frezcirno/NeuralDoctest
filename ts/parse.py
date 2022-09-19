@@ -22,9 +22,27 @@ def tokenize(s: bytes) -> list[bytes]:
     while nodes_to_expand:
         node = nodes_to_expand.pop(0)
         if not node.children and node.text:
-            tokens.append(node.text.decode())
+            tokens.append(s[node.start_byte: node.end_byte].decode())
         nodes_to_expand = node.children + nodes_to_expand
     return tokens
+
+
+def remove_comments(s: bytes) -> bytes:
+    tree = parse_ast(s)
+    comments = []
+    nodes_to_expand: List[Node] = [tree.root_node]
+    while nodes_to_expand:
+        node = nodes_to_expand.pop(0)
+        if not node.children and node.start_byte < node.end_byte:
+            if node.type == "line_comment" or node.type == "block_comment":
+                comments.append((node.start_byte, node.end_byte))
+        nodes_to_expand = node.children + nodes_to_expand
+    okcode = b''
+    last = 0
+    for start, end in comments:
+        okcode += s[last:start]
+        last = end
+    return okcode + s[last:]
 
 
 def treeify(n: Node) -> dict:
@@ -40,16 +58,15 @@ def treeify(n: Node) -> dict:
 if __name__ == "__main__":
     code = b"""
     fn main() {
-        let x = 1;
-        let y = 2;
-        let z = x + y;
-        x = y;
-        y += z;
-        if x == y {
-        } else {
-        }
-    }
-}"""
+        assert_eq!(safe_gcd(&1, &1), Value::integer(1));
+        assert_eq!(safe_gcd(&1, &1), Value::integer(1));
+        assert_eq!(safe_gcd(&1, &1), Value::integer(1));
+        assert_eq!(safe_gcd(&1, &1), Value::integer(1));
+        assert_eq!(safe_gcd(&1, &1), Value::integer(1));
+        assert_eq!(safe_gcd(&1, &1), Value::bignum((BigInt::from(1) << 1).abs()));
+        assert_eq!(safe_gcd(&1, &1), Value::bignum((BigInt::from(1) << 1).abs()));
+        assert_eq!(safe_gcd(&1, &1), Value::bignum((BigInt::from(1) << 1).abs()));
+    }"""
     print(code)
 
     tree = parse_ast(code)

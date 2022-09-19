@@ -126,6 +126,10 @@ def main():
     df = pd.DataFrame(data)
     df.to_parquet("/data1/zixuantan/github/data-new/codedocdata.parquet")
 
+    print("Done")
+    for _, full_name in riter:
+        os.remove("/tmp/" + full_name.replace("/", "+") + ".pickle")
+
 
 # path = '/data1/zixuantan/rust_repos/POC-polkadai-bridge/bridge/validator/vendor/substrate-api-client/src/examples/extrinsic/mod.rs'
 # with open(path, 'rb') as f:
