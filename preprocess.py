@@ -131,6 +131,7 @@ def truncate_docstring(s: str) -> str:
     if s.startswith("<p>"):
         s = s[3:]
 
+    assert '\n' not in s
     return s
 
 
@@ -176,18 +177,16 @@ def process_string(tok: str, is_comment: bool) -> str:
 
 
 def parse_code(code: str,
-               handle_id: Literal['none|split'],
                handle_str: Literal['none|mask|process'],
                handle_num: Literal['none|mask'],
-               handle_comment: Literal['none|drop']) -> list[str]:
-    """ Parse a code block and return a list of tokens. """
-
+               handle_comment: Literal['none|drop']) -> str:
+    """ Parse a code block and return processed codes. """
     if len(code) == 0:
-        return []
+        return ""
 
     if len(code) > 1.5e6:
         print(f"Code is too long: {len(code)}")
-        return []
+        return ""
 
     bcode = code.encode('utf-8')
     tree = parse_ast(bcode)
@@ -208,59 +207,45 @@ def parse_code(code: str,
         nodes_to_expand = node.children + nodes_to_expand
 
     # process
-    tokens = []
+    okcode = b''
+    last = 0
     for node in nodes:
-        text = bcode[node.start_byte:node.end_byte].decode('utf-8')
-        if node.type == 'identifier' or node.type == 'type_identifier':
-            if handle_id == 'split':
-                segs = token_utils.split_snake_case(text)
-                for seg in segs:
-                    if token_utils.need_camel_split(seg):
-                        subseg = token_utils.split_camel_case(seg)
-                        tokens.extend(subseg)
-                    else:
-                        tokens.append(seg)
-            else:
-                tokens.append(text)
+        text = bcode[node.start_byte:node.end_byte]
 
-        elif node.type == 'line_comment' or node.type == 'block_comment':
+        okcode += bcode[last:node.start_byte]
+
+        # Let BPE handle the identifier
+        if node.type == 'line_comment' or node.type == 'block_comment':
             if handle_comment == 'drop':
-                continue
+                pass
             else:
-                tokens.append(text)
+                okcode += text
 
         elif node.type == 'string_literal' or node.type == 'raw_string_literal':
             if handle_str == 'mask':
-                tokens.append('<STR>')
+                okcode += b'<STR>'
             elif handle_str == 'process':
-                tokens.append(process_string(text, False))
+                okcode += process_string(text.decode('utf-8'), False).encode('utf-8')
             else:
-                tokens.append(text)
+                okcode += text
 
         elif node.type == 'float_literal' or node.type == 'integer_literal':
             if handle_num == 'mask':
-                tokens.append("<NUM>")
+                okcode += b"<NUM>"
             else:
-                tokens.append(text)
+                okcode += text
 
         else:
-            tokens.append(text)
-    return tokens
+            okcode += text
 
+        last = node.end_byte
 
-def parse_code_join(code: str,
-                    handle_id: Literal['none|split'],
-                    handle_str: Literal['none|mask|process'],
-                    handle_num: Literal['none|mask'],
-                    handle_comment: Literal['none|drop']) -> str:
-    """ Parse a code block and return a string of tokens. """
-    tokens = parse_code(code, handle_id, handle_str, handle_num, handle_comment)
-    return " ".join(tokens)
+    okcode += bcode[last:]
+    return okcode.decode('utf-8')
 
 
 def process_df(
     df: pd.DataFrame,
-    handle_id: Literal['none|split'],
     handle_str: Literal['none|mask|process'],
     handle_num: Literal['none|mask'],
     handle_comment: Literal['none|drop'],
@@ -271,40 +256,37 @@ def process_df(
 
     # Preprocess the rows
     doctest = df.doc.map(find_longest_code)
-    doctest = doctest.apply(parse_code_join, args=(
-        handle_id, handle_str, handle_num, handle_comment))
+    doctest = doctest.apply(parse_code, args=(handle_str, handle_num, handle_comment))
     df['doctest'] = doctest
-    df = df[doctest.map(lambda s: '\n' not in s)]
+    # df = df[doctest.map(lambda s: '\n' not in s)]
 
     df['doc'] = df.doc.map(truncate_docstring)
-    df = df[df.doc.map(lambda s: '\t' not in s)]
+    # df = df[df.doc.map(lambda s: '\t' not in s)]
 
-    df['code'] = df.code.apply(parse_code_join, args=(
-        handle_id, handle_str, handle_num, handle_comment))
-    df = df[df.code.map(lambda s: '\t' not in s and '\n' not in s)]
+    df['code'] = df.code.apply(parse_code, args=(handle_str, handle_num, handle_comment))
+    # df = df[df.code.map(lambda s: '\t' not in s and '\n' not in s)]
+    df = df[df.code.map(lambda s: len(s) > 0)]
 
     return df
 
 
 def process(
     path: str,  # df: pd.DataFrame,
-    handle_id: Literal['none|split'],
     handle_str: Literal['none|mask|process'],
     handle_num: Literal['none|mask'],
     handle_comment: Literal['none|drop'],
 ) -> None:
     df = pd.read_parquet(path)
-    df = process_df(df, handle_id, handle_str, handle_num, handle_comment)
+    df = process_df(df, handle_str, handle_num, handle_comment)
     df.to_parquet(path)
 
 
 def main():
     parser = argparse.ArgumentParser(description='Preprocess the dataset')
-    parser.add_argument('--input', type=str, required=True, help='input file')
-    parser.add_argument('--output', type=str,
-                        required=True, help='output file')
-    parser.add_argument('--handle_id', type=str,
-                        default='none', help='handle id')
+    parser.add_argument('--input', type=str, help='input file',
+                        default="data-new/codedocdata.parquet")
+    parser.add_argument('--output', type=str, help='output file',
+                        default="data-new/codedocdata.preprocessed.parquet")
     parser.add_argument('--handle_str', type=str,
                         default='process', help='handle str')
     parser.add_argument('--handle_num', type=str,
@@ -316,7 +298,9 @@ def main():
     df = pd.read_parquet(args.input)
 
     # Drop duplicates
-    df = df.drop_duplicates(subset=['code'])  # 14754231 -> 6451052
+    print("Dropping duplicates...", len(df), end=' ')
+    df = df.drop_duplicates(subset=['code'])
+    print("->", len(df))
 
     # Split the dataframe into multiple dataframes
     paths = []
@@ -328,16 +312,16 @@ def main():
 
     # Process the dataframe
     with Pool() as p:
-        p.starmap(process, zip(paths, repeat(args.handle_id),
-                               repeat(args.handle_str),
-                               repeat(args.handle_num), repeat(args.handle_comment)))
+        p.starmap(process, zip(paths, repeat(args.handle_str), repeat(args.handle_num), repeat(args.handle_comment)))
 
     # Merge the parts
     print("Merging...")
     df = pd.concat([pd.read_parquet(path) for path in paths])
 
     # Drop duplicates again
+    print("Dropping duplicates...", len(df), end=' ')
     df = df.drop_duplicates(subset=['code'])
+    print("->", len(df))
 
     df.to_parquet(args.output)
 
