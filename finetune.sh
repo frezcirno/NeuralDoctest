@@ -1,7 +1,7 @@
-pre_dir=run_new_nomasknum_fixcont_fixcomma_dedup_fixcomma2
-dir=run_ft_new_nomasknum_fixcont_fixcomma_dedup_fixcomma2_newdata
+pre_dir=run_ft
+dir=run_ft
 mkdir -p $dir/res $dir/summary
-CUDA_VISIBLE_DEVICES=1,2 torchrun \
+CUDA_VISIBLE_DEVICES=0,3 torchrun \
  --nproc_per_node 2 \
  codet5_finetune_train.py \
  --task translate \

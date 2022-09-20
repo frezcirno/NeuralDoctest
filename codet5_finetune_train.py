@@ -94,6 +94,11 @@ def eval_bleu_epoch(args, eval_data, eval_examples, model, tokenizer, split_tag,
 
     pred_nls = [tokenizer.decode(id, skip_special_tokens=True, clean_up_tokenization_spaces=False) for id in pred_ids]
 
+    golds = [ex.target for ex in eval_examples]
+    indices = [ex.idx for ex in eval_examples]
+    dframe = pd.DataFrame({'pred': pred_nls, 'gold': golds}, index=indices)
+    dframe.to_parquet(os.path.join(args.res_dir, 'pred_{}.parquet'.format(split_tag)))
+
     output_fn_idx = os.path.join(args.res_dir, "test_{}.output".format(criteria))
     gold_fn_idx = os.path.join(args.res_dir, "test_{}.gold".format(criteria))
     src_fn_idx = os.path.join(args.res_dir, "test_{}.src".format(criteria))

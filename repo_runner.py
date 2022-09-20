@@ -22,39 +22,6 @@ def process_string(s: str):
     return replace_general_string_tok(s)
 
 
-def parse_code(code: str) -> str:
-    """ Parse a code block and return a list of tokens. """
-    bcode = code.encode('utf-8')
-    tree = parse_ast(bcode)
-
-    # retrival
-    nodes = []
-    nodes_to_expand = [tree.root_node]
-    while nodes_to_expand:
-        node = nodes_to_expand.pop(0)
-        if node.type == 'string_literal':
-            nodes.append(node)
-            continue
-
-        if not node.children and node.start_byte < node.end_byte:
-            nodes.append(node)
-            continue
-
-        nodes_to_expand = node.children + nodes_to_expand
-
-    # process
-    tokens = []
-    for node in nodes:
-        text = bcode[node.start_byte:node.end_byte].decode('utf-8')
-
-        if node.type == 'string_literal' or node.type == 'raw_string_literal':
-            tokens.append(process_string(text))
-
-        else:
-            tokens.append(text)
-    return " ".join(tokens)
-
-
 def sed_replace(file_path: str, old_str: str, new_str: str) -> None:
     """ Replace a string in a file. """
     with open(file_path, 'r') as f:
@@ -110,11 +77,11 @@ def run_test(row):
         print(directive, file=f)
 
     with open(fgenerated, "w") as f:
-        hasmain = 'fn main' in row.output
+        hasmain = 'fn main' in row.pred
         if hasmain:
-            print(row.output, file=f)
+            print(row.pred, file=f)
         else:
-            lines = row.output.split(';')
+            lines = row.pred.split(';')
             uses = []
             nonuses = []
             for line in lines:
@@ -125,7 +92,7 @@ def run_test(row):
                     uses.append(line)
                 else:
                     nonuses.append(line)
-            # Copy the original use statements
+            ## Copy the use statements in corrisponding unit
             # with open(file, 'r') as target:
             #     start = 0
             #     for line in target:
@@ -134,7 +101,7 @@ def run_test(row):
             #             start = 1
             #         if ';' in line:
             #             start = 0
-            # Copy generated use statements
+            ## Copy generated use statements
             for line in uses:
                 f.write(line.lstrip(" #"))
                 f.write(";\n")
@@ -158,7 +125,7 @@ def run_test(row):
         f.write(out)
         f.write(err)
     with open(foutput, "w") as f:
-        f.write(row.output)
+        f.write(row.pred)
     with open(fgold, "w") as f:
         f.write(row.gold)
     return False
@@ -182,10 +149,7 @@ cargo = shutil.which('cargo')
 git = shutil.which('git')
 odf = pd.read_parquet("data-new/codedocdata.parquet")
 all_repo_base = "/data1/zixuantan/rust_repos/"
-df = pd.read_parquet("data-new/test_best-bleu.parquet")
-
-df['gold'] = df['gold'].apply(parse_code)
-df['output'] = df['output'].apply(parse_code)
+df = pd.read_parquet("run_ft/res/pred_test.parquet")
 
 # Split the dataframe into multiple dataframes
 paths = []

@@ -286,9 +286,9 @@ def main():
     parser.add_argument('--input', type=str, help='input file',
                         default="data-new/codedocdata.parquet")
     parser.add_argument('--output', type=str, help='output file',
-                        default="data-new/codedocdata.preprocessed.parquet")
+                        default="data-new/codedocdata.processed.parquet")
     parser.add_argument('--handle_str', type=str,
-                        default='process', help='handle str')
+                        default='none', help='handle str')
     parser.add_argument('--handle_num', type=str,
                         default='none', help='handle num')
     parser.add_argument('--handle_comment', type=str,
